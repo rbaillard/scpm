@@ -3,7 +3,7 @@ class Workload
   include ApplicationHelper, WorkloadPlanningsHelper
 
   attr_reader :name,  # person's name
-    :names,           # Filtre's projects names 
+    :names,           # Filtre's projects names
     :weeks,           # arrays of week's names '43', '44', ...
     :wl_weeks,        # array of week ids '201143'
     :months,          # "Oct"
@@ -11,6 +11,8 @@ class Workload
     :opens,           # total of worked days per week (5 - nb of holidays)
     :person,
     :person_id,
+    :projects,
+    :planning_tasks,
     :wl_lines,        # arrays of loads, all lines (filtered and not filtered)
     :displayed_lines, # only filtered lines
     :line_sums,       # sum of days per line of workload
@@ -18,7 +20,7 @@ class Workload
     :availability,    # total days of availability {:days=>xxx, :percent=>yyy}
     :sum_availability,# sum of availabity days for the next 8 weeks
     :cprodtotals,     # total days planned per week on production only {:id=>w, :value=>col_prod_sum(w, @wl_lines)}
-    :percents,        # total percent per week: {:name=>'cpercent', :id=>w, :value=>percent.round.to_s+"%", :precise=>percent}
+    :percents,        # total percent per week: {:name=>'cpercent', :id=>w, :display=>percent.round.to_s+"%", :value=>percent}
     :next_month_percents,         # next 5 weeks capped (including current)
     :three_next_months_percents,  # next 3 months capped (was _after_ the 5 coming weeks but changed later including next 5 weeks)
     :total,                       # total number of days planned (including past weeks)
@@ -33,17 +35,20 @@ class Workload
 
   # options can have
   # :only_holidays => true
-  def initialize(person_id, project_ids, iterations, options = {})
+  def initialize(person_id, project_ids, iterations, tags_ids, options = {})
 
     # return if project_ids.size==0
     @person     = Person.find(person_id)
     raise "could not find this person by id '#{person_id}'" if not @person
+    @projects = Project.find(:all, :conditions=>["id in (#{project_ids.join(',')})"]) if project_ids.size!=0
+    @projects = WlLine.find(:all, :conditions=>["person_id=#{person_id} and project_id is not null"]).collect{|l| Project.find(l.project_id)}.uniq if project_ids.size==0
     @person_id  = person_id
     @name       = @person.name
 
     # calculate lines
     cond = ""
     cond += " and wl_type=300" if options[:only_holidays] == true
+
     if iterations.size == 0
       @names      = project_ids.map{ |id| Project.find(id).name}.join(', ')
     else
@@ -65,20 +70,24 @@ class Workload
         @names << ", " if cpt < project_ids.length
       end
     end
+    # Case: no project selected
     if !project_ids or project_ids.size==0
       @wl_lines   = WlLine.find(:all, :conditions=>["person_id=#{person_id}"+cond], :include=>["request","wl_line_task","person"], :order=>APP_CONFIG['project_workloads_lines_sort'])
     else
+    # Case: at least, one project selected
+    # No iteration selected
       if iterations.size==0
         @wl_lines   = WlLine.find(:all, :conditions=>["project_id in (#{project_ids.join(',')})"+cond+" and person_id=#{person_id}"], :include=>["request","wl_line_task","person"], :order=>APP_CONFIG['project_workloads_lines_sort'])
       else
+    # at least, one iteration selected
         project_ids_without_iterations  =[]     # Array which contains ids of projects we don't want to filter with iterations
-        project_ids_with_iterations     =[]     # Array which contains ids of projects we want to filter with iterations 
+        project_ids_with_iterations     =[]     # Array which contains ids of projects we want to filter with iterations
         project_ids.each do |p|
           project_ids_without_iterations << p
         end
         iterations.each do |i|
           if project_ids_without_iterations.include? i[:project_id].to_s
-            project_ids_without_iterations.delete(i[:project_id].to_s) 
+            project_ids_without_iterations.delete(i[:project_id].to_s)
             project_ids_with_iterations << i[:project_id].to_s
           end
         end
@@ -103,19 +112,20 @@ class Workload
               end
 
               l.sdp_tasks.each do |s|
-                add_line_condition = true if line_iterations.include? [s.iteration,s.project_code] 
+                add_line_condition = true if line_iterations.include? [s.iteration,s.project_code]
               end
-              
+
             end
             # Line respecting conditions added to the workload lines
             @wl_lines << l if add_line_condition
           end
-        end  
+        end
       end
-      #WlLine.find(:all, :conditions=>["project_id is null and person_id=#{person_id}"]).each do |l|
-      #  @wl_lines << l
-      #end
     end
+
+    # Case: tags selected
+    @wl_lines = @wl_lines.select{|l|l.tag_in(tags_ids) == true} if tags_ids.size > 0
+
     #Rails.logger.debug "\n===== hide_lines_with_no_workload: #{options[:hide_lines_with_no_workload]}\n\n"
     if options[:only_holidays] != true
       line_count = WlLine.find(:all, :conditions=>["person_id=#{person_id}"])
@@ -191,7 +201,7 @@ class Workload
           percent = 100
         end
         open    = @opens.last
-        avail   = [0,(open-col_sum)].max
+        avail   = open-col_sum # [0,(open-col_sum)].max
         if open > 0
           avail_percent = (avail/open).round
         else
@@ -202,11 +212,11 @@ class Workload
         else
           @staffing << 0
         end
-        @availability   << {:name=>'avail',:id=>w, :avail=>avail, :value=>(avail==0 ? '' : avail), :percent=>avail_percent}
+        @availability   << {:name=>'avail',:id=>w, :value=>avail, :display=>(avail==0 ? '' : avail), :percent=>avail_percent}
         @sum_availability += (avail==0 ? '' : avail).to_f if nb<=8
         @next_month_percents += capped_if_option(percent) if nb < 5
         @three_next_months_percents += capped_if_option(percent) if nb >= 0 and nb < 0+12 # if nb >= 5 and nb < 5+12 # 28-Mar-2012: changed
-        @percents << {:name=>'cpercent', :id=>w, :value=>percent.round.to_s+"%", :precise=>percent}
+        @percents << {:name=>'cpercent', :id=>w, :value=>percent, :display=>percent.round.to_s+"%"}
       end
       iteration = iteration + 7.days
       nb += 1
@@ -260,6 +270,7 @@ class Workload
         @line_sums[l.id][:consumed]  = 0.0
       end
     end
+    @planning_tasks = get_plannings(@projects, wl_weeks)
   end
 
   def col_sum(w, wl_lines)

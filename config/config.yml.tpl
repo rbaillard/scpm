@@ -3,9 +3,6 @@ scpm_title: "SCPM Title"
 scpm_address: "http://scpm.sqli.com"
 project_name: "Your project code so you can configure display options"
 
-# report
-report_timeline_count: 30 # Number of timeline displayed in the list of projects
-
 # menu and access configuration
 workloads_add_by_request_number: true
 workloads_add_by_sdp_task: true
@@ -23,13 +20,14 @@ workloads_show_consolidation_filters: false
 workloads_display_total_column: false
 workloads_display_consumed_column: false
 workloads_lines_sort: "[l.project_id, l.wl_type, l.display_name.upcase]"
-project_workloads_lines_sort: "project_id,wl_type,name" # Order of wlline in workload
+project_workloads_lines_sort: "l.display_name.upcase"
 workloads_max_height: 500
 consolidation_alert_on_overworkload: false
 consolidation_capped_next_weeks: false
 automatic_except_line_addition: false
-workloads_show_filter: false # Show or hide the filter buttn
-
+workloads_display_consumed_column: true
+workloads_display_diff_between_consumed_and_planned_column: true
+workloads_display_status_column: true
 
 # SDP
 use_multiple_projects_sdp_export: false
