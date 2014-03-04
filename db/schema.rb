@@ -9,7 +9,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20131120111300) do
+ActiveRecord::Schema.define(:version => 20130917130404) do
 
   create_table "actions", :force => true do |t|
     t.text     "action"
@@ -319,6 +319,13 @@ ActiveRecord::Schema.define(:version => 20131120111300) do
     t.datetime "updated_at"
   end
 
+  create_table "line_tags", :force => true do |t|
+    t.integer  "line_id"
+    t.integer  "tag_id"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
   create_table "logs", :force => true do |t|
     t.string   "controller"
     t.string   "action"
@@ -391,14 +398,6 @@ ActiveRecord::Schema.define(:version => 20131120111300) do
   create_table "plannings", :force => true do |t|
     t.string   "name"
     t.integer  "project_id"
-    t.datetime "created_at"
-    t.datetime "updated_at"
-  end
-
-  create_table "pm_type_axe_excels", :force => true do |t|
-    t.integer  "axe_id"
-    t.integer  "lifecycle_id"
-    t.integer  "excel_position"
     t.datetime "created_at"
     t.datetime "updated_at"
   end
@@ -607,8 +606,8 @@ ActiveRecord::Schema.define(:version => 20131120111300) do
     t.integer  "is_quality",      :default => 1
     t.integer  "generic_risk_id"
     t.integer  "stream_id"
-    t.integer  "is_ria_logged",   :default => 0
-    t.integer  "is_ria_action",   :default => 0
+    t.boolean  "is_ria_logged",   :default => false
+    t.boolean  "is_ria_action",   :default => false
     t.integer  "old_impact",      :default => 0
     t.integer  "old_probability", :default => 0
   end
@@ -749,6 +748,16 @@ ActiveRecord::Schema.define(:version => 20131120111300) do
     t.string   "project_code"
   end
 
+  create_table "sessions", :force => true do |t|
+    t.string   "session_id", :null => false
+    t.text     "data"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
+  add_index "sessions", ["session_id"], :name => "index_sessions_on_session_id"
+  add_index "sessions", ["updated_at"], :name => "index_sessions_on_updated_at"
+
   create_table "spider_consolidations", :force => true do |t|
     t.integer  "spider_id"
     t.integer  "pm_type_axe_id"
@@ -775,7 +784,6 @@ ActiveRecord::Schema.define(:version => 20131120111300) do
     t.datetime "created_at"
     t.datetime "updated_at"
     t.string   "file_link"
-    t.boolean  "impact_count", :default => false
   end
 
   create_table "statuses", :force => true do |t|
@@ -834,6 +842,12 @@ ActiveRecord::Schema.define(:version => 20131120111300) do
   end
 
   create_table "suite_tags", :force => true do |t|
+    t.string   "name"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
+  create_table "tags", :force => true do |t|
     t.string   "name"
     t.datetime "created_at"
     t.datetime "updated_at"
